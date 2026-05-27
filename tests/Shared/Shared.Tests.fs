@@ -54,6 +54,15 @@ module SetupNoteSamples =
             [ "Right arm cup : ....................."
               "Vinge H\u00f8: C, S: 2" ]
 
+    let keyWithoutImmediateValue =
+        String.concat
+            "\n"
+            [ "Prescriptions:"
+              ""
+              ""
+              "Comments:"
+              "yes" ]
+
 type SetupNoteBeautifierRegressionTests() =
     [<Fact>]
     member _.``Default mode removes empty lines and supports next-line values``() =
@@ -137,6 +146,20 @@ type SetupNoteBeautifierRegressionTests() =
 
         let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
         Assert.Equal("Patient Orientation=HFS", result.Output)
+
+    [<Fact>]
+    member _.``Missing key value does not consume later title as value``() =
+        let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions SetupNoteSamples.keyWithoutImmediateValue
+        Assert.Equal("Prescriptions=\nComments=yes", result.Output)
+
+    [<Fact>]
+    member _.``When RemoveEmptyKeys is true entries with empty values are removed``() =
+        let options =
+            { SetupNoteBeautifier.defaultOptions with
+                RemoveEmptyKeys = true }
+
+        let result = SetupNoteBeautifier.trim options SetupNoteSamples.keyWithoutImmediateValue
+        Assert.Equal("Comments=yes", result.Output)
 
     [<Fact>]
     member _.``Output length at or below 230 has no warning and no hard limit``() =

@@ -29,3 +29,12 @@ type UpdateTests() =
         Assert.True(updatedModel.RawText.Contains("Template:"))
         Assert.True(updatedModel.Output.Contains("Template=Breast"))
         Assert.True(updatedModel.CharacterCount > 0)
+
+    [<Fact>]
+    member _.``Generated output can be edited manually and character count follows edited text``() =
+        let model, _ = init ()
+        let withText, _ = update (RawTextChanged "Template:\nBreast") model
+        let edited, _ = update (OutputTextChanged "Template=Breast\nComment=manual") withText
+
+        Assert.Equal("Template=Breast\nComment=manual", edited.Output)
+        Assert.Equal(30, edited.CharacterCount)

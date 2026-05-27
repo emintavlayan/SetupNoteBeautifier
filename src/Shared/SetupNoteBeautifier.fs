@@ -4,11 +4,11 @@ open System
 open System.Text.RegularExpressions
 
 type TrimOptions =
-    { DeleteEmptyLines: bool
-      RemoveSeparatorLines: bool
+    { RemoveSeparatorLines: bool
       RemoveDotFillers: bool
       NormalizeSpaces: bool
-      KeepKeyValuePairsOnly: bool
+      RemoveHeaderLines: bool
+      RemoveEmptyKeys: bool
       ShortenKnownKeys: bool
       ShortenKnownValues: bool }
 
@@ -24,11 +24,11 @@ type TrimResult =
 module SetupNoteBeautifier =
     /// Default trimming options for setup note cleanup.
     let defaultOptions =
-        { DeleteEmptyLines = true
-          RemoveSeparatorLines = true
+        { RemoveSeparatorLines = true
           RemoveDotFillers = true
           NormalizeSpaces = true
-          KeepKeyValuePairsOnly = true
+          RemoveHeaderLines = true
+          RemoveEmptyKeys = false
           ShortenKnownKeys = false
           ShortenKnownValues = false }
 
@@ -83,14 +83,12 @@ module SetupNoteBeautifier =
         else
             Some(line.Substring(0, idx), line.Substring(idx + 1))
 
-    /// Finds the next non-empty non-separator line index from a start index.
-    let findNextValueIndex (lines: string list) (startIndex: int) =
-        lines
-        |> List.mapi (fun i line -> i, line)
-        |> List.tryFind (fun (i, line) -> i >= startIndex && not (isEmptyLine line) && not (isSeparatorLine line))
-        |> Option.map fst
+    /// Returns true when a line likely represents a simple key-value entry.
+    let looksLikeKeyLine (line: string) =
+        let colonCount = line |> Seq.filter (fun c -> c = ':') |> Seq.length
+        colonCount = 1 && (splitFirstColon line |> Option.isSome)
 
-    /// Parses key-value pairs from lines while supporting values on the following line.
+    /// Parses key-value pairs while supporting values only on the immediate next line.
     let parseKeyValues (lines: string list) =
         let rec loop i acc =
             if i >= lines.Length then
@@ -105,11 +103,17 @@ module SetupNoteBeautifier =
                     if value <> "" then
                         loop (i + 1) ({ Key = key; Value = value } :: acc)
                     else
-                        match findNextValueIndex lines (i + 1) with
-                        | Some nextIndex ->
-                            let nextValue = lines[nextIndex].Trim()
-                            loop (nextIndex + 1) ({ Key = key; Value = nextValue } :: acc)
-                        | None -> loop (i + 1) ({ Key = key; Value = "" } :: acc)
+                        let hasImmediateNext = i + 1 < lines.Length
+
+                        if not hasImmediateNext then
+                            loop (i + 1) ({ Key = key; Value = "" } :: acc)
+                        else
+                            let nextLine = lines[i + 1].Trim()
+
+                            if isEmptyLine nextLine || isSeparatorLine nextLine || looksLikeKeyLine nextLine then
+                                loop (i + 1) ({ Key = key; Value = "" } :: acc)
+                            else
+                                loop (i + 2) ({ Key = key; Value = nextLine } :: acc)
 
         loop 0 []
 
@@ -152,6 +156,10 @@ module SetupNoteBeautifier =
         { Key = if options.ShortenKnownKeys then shortenKey pair.Key else pair.Key
           Value = if options.ShortenKnownValues then shortenValue pair.Value else pair.Value }
 
+    /// Removes entries where key has no value.
+    let removeEmptyValues (pairs: KeyValue list) =
+        pairs |> List.filter (fun p -> not (String.IsNullOrWhiteSpace p.Value))
+
     /// Renders key-value pairs in key=value format separated by newlines.
     let renderKeyValues (pairs: KeyValue list) = pairs |> List.map (fun p -> $"{p.Key}={p.Value}") |> String.concat "\n"
 
@@ -171,7 +179,7 @@ module SetupNoteBeautifier =
             |> normalizeLineEndings
             |> splitLines
             |> trimLines
-            |> fun xs -> if options.DeleteEmptyLines then removeEmptyLines xs else xs
+            |> fun xs -> if options.NormalizeSpaces then removeEmptyLines xs else xs
             |> fun xs -> if options.RemoveSeparatorLines then removeSeparatorLines xs else xs
             |> fun xs -> if options.RemoveDotFillers then removeDotFillersFromLines xs else xs
 
@@ -180,7 +188,8 @@ module SetupNoteBeautifier =
             |> parseKeyValues
             |> List.map (normalizeKeyValue options.NormalizeSpaces)
             |> List.map (shortenKnown options)
+            |> fun xs -> if options.RemoveEmptyKeys then removeEmptyValues xs else xs
 
-        let pairs = if options.KeepKeyValuePairsOnly then keyValues else keyValues
+        let pairs = if options.RemoveHeaderLines then keyValues else keyValues
         pairs |> renderKeyValues |> fun output -> toTrimResult output pairs
 

@@ -16,11 +16,11 @@ type CounterState =
     | CounterError
 
 type OptionField =
-    | DeleteEmptyLines
     | RemoveSeparatorLines
     | RemoveDotFillers
     | NormalizeSpaces
-    | KeepKeyValuePairsOnly
+    | RemoveHeaderLines
+    | RemoveEmptyKeys
     | ShortenKnownValues
     | ShortenKnownKeys
 
@@ -33,6 +33,7 @@ type Model =
 
 type Msg =
     | RawTextChanged of string
+    | OutputTextChanged of string
     | ToggleOption of OptionField
     | LoadSample
     | CopyOutput
@@ -73,11 +74,11 @@ let evaluateModel (model: Model) =
 /// Toggles one trimming option in the current options record.
 let toggleOption (field: OptionField) (options: TrimOptions) =
     match field with
-    | DeleteEmptyLines -> { options with DeleteEmptyLines = not options.DeleteEmptyLines }
     | RemoveSeparatorLines -> { options with RemoveSeparatorLines = not options.RemoveSeparatorLines }
     | RemoveDotFillers -> { options with RemoveDotFillers = not options.RemoveDotFillers }
     | NormalizeSpaces -> { options with NormalizeSpaces = not options.NormalizeSpaces }
-    | KeepKeyValuePairsOnly -> { options with KeepKeyValuePairsOnly = not options.KeepKeyValuePairsOnly }
+    | RemoveHeaderLines -> { options with RemoveHeaderLines = not options.RemoveHeaderLines }
+    | RemoveEmptyKeys -> { options with RemoveEmptyKeys = not options.RemoveEmptyKeys }
     | ShortenKnownValues -> { options with ShortenKnownValues = not options.ShortenKnownValues }
     | ShortenKnownKeys -> { options with ShortenKnownKeys = not options.ShortenKnownKeys }
 
@@ -131,6 +132,12 @@ let update msg model =
             RawText = value
             CopyStatus = NotCopied }
         |> evaluateModel,
+        Cmd.none
+    | OutputTextChanged value ->
+        { model with
+            Output = value
+            CharacterCount = value.Length
+            CopyStatus = NotCopied },
         Cmd.none
     | ToggleOption field ->
         { model with
@@ -221,7 +228,6 @@ let view model dispatch =
             Html.section [
                 prop.className "options"
                 prop.children [
-                    optionCheckbox "Delete empty lines" DeleteEmptyLines model.Options.DeleteEmptyLines dispatch
                     optionCheckbox
                         "Remove separator lines"
                         RemoveSeparatorLines
@@ -230,9 +236,14 @@ let view model dispatch =
                     optionCheckbox "Remove dot fillers" RemoveDotFillers model.Options.RemoveDotFillers dispatch
                     optionCheckbox "Normalize spaces" NormalizeSpaces model.Options.NormalizeSpaces dispatch
                     optionCheckbox
-                        "Keep key-value pairs only"
-                        KeepKeyValuePairsOnly
-                        model.Options.KeepKeyValuePairsOnly
+                        "Remove header lines (titles)"
+                        RemoveHeaderLines
+                        model.Options.RemoveHeaderLines
+                        dispatch
+                    optionCheckbox
+                        "Remove empty keys"
+                        RemoveEmptyKeys
+                        model.Options.RemoveEmptyKeys
                         dispatch
                     optionCheckbox "Shorten known values" ShortenKnownValues model.Options.ShortenKnownValues dispatch
                     optionCheckbox
@@ -270,7 +281,7 @@ let view model dispatch =
                             Html.textarea [
                                 prop.className "text-area"
                                 prop.value model.Output
-                                prop.readOnly true
+                                prop.onChange (OutputTextChanged >> dispatch)
                             ]
                             Html.p [
                                 prop.className (counterClassName model.CharacterCount)
