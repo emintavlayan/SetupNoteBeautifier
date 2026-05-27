@@ -1,150 +1,282 @@
 module Index
 
 open Elmish
-open SAFE
+open Feliz
+open Fable.Core
 open Shared
 
-type Model = {
-    Todos: RemoteData<Todo list>
-    Input: string
-}
+type CopyStatus =
+    | NotCopied
+    | CopySucceeded
+    | CopyFailed
+
+type CounterState =
+    | CounterNormal
+    | CounterWarning
+    | CounterError
+
+type OptionField =
+    | DeleteEmptyLines
+    | RemoveSeparatorLines
+    | RemoveDotFillers
+    | NormalizeSpaces
+    | KeepKeyValuePairsOnly
+    | ShortenKnownValues
+    | ShortenKnownKeys
+
+type Model =
+    { RawText: string
+      Options: TrimOptions
+      Output: string
+      CharacterCount: int
+      CopyStatus: CopyStatus }
 
 type Msg =
-    | SetInput of string
-    | LoadTodos of ApiCall<unit, Todo list>
-    | SaveTodo of ApiCall<string, Todo list>
+    | RawTextChanged of string
+    | ToggleOption of OptionField
+    | LoadSample
+    | CopyOutput
+    | OutputCopied
+    | OutputCopyFailed
+    | ClearInput
 
-let todosApi = Api.makeProxy<ITodosApi> ()
+/// Writes text to browser clipboard via JavaScript navigator API.
+[<Emit("globalThis.navigator.clipboard.writeText($0)")>]
+let writeClipboard (text: string) : JS.Promise<unit> = jsNative
 
+/// Provides representative sample setup note text for the load sample action.
+let sampleSetupNote =
+    String.concat
+        "\n"
+        [ "General"
+          "Template:"
+          "Breast"
+          ""
+          "Patient Orientation: Head First Supine"
+          "Right arm cup : ....................."
+          "Vinge H\u00f8:  C, S:  2"
+          "Breast board"
+          "Comments: yes" ]
+
+/// Applies trim options to raw input and returns output text with character count.
+let applyTrim (options: TrimOptions) (rawText: string) =
+    let result = SetupNoteBeautifier.trim options rawText
+    result.Output, result.CharacterCount
+
+/// Recomputes output and character count after model changes.
+let evaluateModel (model: Model) =
+    let output, characterCount = applyTrim model.Options model.RawText
+    { model with
+        Output = output
+        CharacterCount = characterCount }
+
+/// Toggles one trimming option in the current options record.
+let toggleOption (field: OptionField) (options: TrimOptions) =
+    match field with
+    | DeleteEmptyLines -> { options with DeleteEmptyLines = not options.DeleteEmptyLines }
+    | RemoveSeparatorLines -> { options with RemoveSeparatorLines = not options.RemoveSeparatorLines }
+    | RemoveDotFillers -> { options with RemoveDotFillers = not options.RemoveDotFillers }
+    | NormalizeSpaces -> { options with NormalizeSpaces = not options.NormalizeSpaces }
+    | KeepKeyValuePairsOnly -> { options with KeepKeyValuePairsOnly = not options.KeepKeyValuePairsOnly }
+    | ShortenKnownValues -> { options with ShortenKnownValues = not options.ShortenKnownValues }
+    | ShortenKnownKeys -> { options with ShortenKnownKeys = not options.ShortenKnownKeys }
+
+/// Returns counter visual state from output character count.
+let counterState (count: int) =
+    if count > SetupNoteBeautifier.hardLimit then
+        CounterError
+    elif count > SetupNoteBeautifier.warningLimit then
+        CounterWarning
+    else
+        CounterNormal
+
+/// Returns copy status text shown under action buttons.
+let copyStatusText (status: CopyStatus) =
+    match status with
+    | NotCopied -> ""
+    | CopySucceeded -> "Copied to clipboard."
+    | CopyFailed -> "Copy failed. Please copy manually."
+
+/// Builds counter class name based on warning and hard-limit state.
+let counterClassName (count: int) =
+    match counterState count with
+    | CounterNormal -> "counter counter-normal"
+    | CounterWarning -> "counter counter-warning"
+    | CounterError -> "counter counter-error"
+
+/// Creates a command that writes output text to the clipboard.
+let copyOutputCmd (text: string) =
+    Cmd.OfPromise.either
+        writeClipboard
+        text
+        (fun _ -> OutputCopied)
+        (fun _ -> OutputCopyFailed)
+
+/// Creates the initial model and command for the trimmer page.
 let init () =
-    let initialModel = { Todos = NotStarted; Input = "" }
-    let initialCmd = LoadTodos(Start()) |> Cmd.ofMsg
+    let baseModel =
+        { RawText = ""
+          Options = SetupNoteBeautifier.defaultOptions
+          Output = ""
+          CharacterCount = 0
+          CopyStatus = NotCopied }
 
-    initialModel, initialCmd
+    evaluateModel baseModel, Cmd.none
 
+/// Handles all Elmish messages for local trimmer state updates.
 let update msg model =
     match msg with
-    | SetInput value -> { model with Input = value }, Cmd.none
-    | LoadTodos msg ->
-        match msg with
-        | Start() ->
-            let loadTodosCmd = Cmd.OfAsync.perform todosApi.getTodos () (Finished >> LoadTodos)
+    | RawTextChanged value ->
+        { model with
+            RawText = value
+            CopyStatus = NotCopied }
+        |> evaluateModel,
+        Cmd.none
+    | ToggleOption field ->
+        { model with
+            Options = toggleOption field model.Options
+            CopyStatus = NotCopied }
+        |> evaluateModel,
+        Cmd.none
+    | LoadSample ->
+        { model with
+            RawText = sampleSetupNote
+            CopyStatus = NotCopied }
+        |> evaluateModel,
+        Cmd.none
+    | CopyOutput -> model, copyOutputCmd model.Output
+    | OutputCopied -> { model with CopyStatus = CopySucceeded }, Cmd.none
+    | OutputCopyFailed -> { model with CopyStatus = CopyFailed }, Cmd.none
+    | ClearInput ->
+        { model with
+            RawText = ""
+            CopyStatus = NotCopied }
+        |> evaluateModel,
+        Cmd.none
 
-            { model with Todos = model.Todos.StartLoading() }, loadTodosCmd
-        | Finished todos -> { model with Todos = Loaded todos }, Cmd.none
-    | SaveTodo msg ->
-        match msg with
-        | Start todoText ->
-            let saveTodoCmd =
-                let todo = Todo.create todoText
-                Cmd.OfAsync.perform todosApi.addTodo todo (Finished >> SaveTodo)
-
-            { model with Input = "" }, saveTodoCmd
-        | Finished todos ->
-            {
-                model with
-                    Todos = RemoteData.Loaded todos
-            },
-            Cmd.none
-
-open Feliz
-
-module ViewComponents =
-    let todoAction model dispatch =
-        Html.div [
-            prop.className "flex flex-col sm:flex-row mt-4 gap-4"
-            prop.children [
-                Html.input [
-                    prop.className
-                        "shadow appearance-none border rounded w-full py-2 px-3 outline-none focus:ring-2 ring-teal-300 text-grey-darker text-sm sm:text-base"
-                    prop.value model.Input
-                    prop.placeholder "What needs to be done?"
-                    prop.autoFocus true
-                    prop.onChange (SetInput >> dispatch)
-                    prop.onKeyPress (fun ev ->
-                        if ev.key = "Enter" then
-                            dispatch (SaveTodo(Start model.Input)))
-                ]
-                Html.button [
-                    prop.className
-                        "flex-no-shrink p-2 px-12 rounded bg-teal-600 outline-none focus:ring-2 ring-teal-300 font-bold text-white hover:bg-teal disabled:opacity-30 disabled:cursor-not-allowed text-sm sm:text-base"
-                    prop.disabled (Todo.isValid model.Input |> not)
-                    prop.onClick (fun _ -> dispatch (SaveTodo(Start model.Input)))
-                    prop.text "Add"
-                ]
+/// Renders one checkbox option bound to a toggle message.
+let optionCheckbox (label: string) field value dispatch =
+    Html.label [
+        prop.className "option-item"
+        prop.children [
+            Html.input [
+                prop.type'.checkbox
+                prop.isChecked value
+                prop.onChange (fun (_: bool) -> dispatch (ToggleOption field))
             ]
+            Html.span [ prop.text label ]
         ]
+    ]
 
-    let todoList model dispatch =
-        Html.div [
-            prop.className "rounded-md p-2 sm:p-4 w-full"
-            prop.children [
-                Html.ol [
-                    prop.className "list-decimal ml-4 sm:ml-6"
-                    prop.children [
-                        match model.Todos with
-                        | NotStarted -> Html.text "Not Started."
-                        | Loading None -> Html.text "Loading..."
-                        | Loading (Some todos)
-                        | Loaded todos ->
-                            for todo in todos do
-                                Html.li [
-                                    prop.className "my-1 text-black text-base sm:text-lg break-words"
-                                    prop.text todo.Description
-                                ]
+/// Renders contextual output length warning messages.
+let lengthMessages (model: Model) =
+    let messages =
+        [ if model.CharacterCount > SetupNoteBeautifier.warningLimit && not model.Options.ShortenKnownKeys then
+              Html.p [
+                  prop.className "message message-warning"
+                  prop.text "Output is long. Enable extreme key shortening if needed."
+              ]
+          if model.CharacterCount > SetupNoteBeautifier.hardLimit then
+              Html.p [
+                  prop.className "message message-error"
+                  prop.text "Output is above system limit."
+              ] ]
+
+    Html.div [ prop.children messages ]
+
+/// Renders the setup note trimmer page.
+let view model dispatch =
+    Html.main [
+        prop.className "page"
+        prop.children [
+            Html.h1 [
+                prop.className "title"
+                prop.text "Setup Note Beautifier"
+            ]
+            Html.div [
+                prop.className "actions"
+                prop.children [
+                    Html.button [
+                        prop.className "button"
+                        prop.onClick (fun _ -> dispatch LoadSample)
+                        prop.text "Load sample"
+                    ]
+                    Html.button [
+                        prop.className "button button-secondary"
+                        prop.onClick (fun _ -> dispatch ClearInput)
+                        prop.text "Clear"
+                    ]
+                    Html.button [
+                        prop.className "button"
+                        prop.onClick (fun _ -> dispatch CopyOutput)
+                        prop.disabled (model.Output = "")
+                        prop.text "Copy output"
                     ]
                 ]
-
-                todoAction model dispatch
             ]
-        ]
-
-let view model dispatch =
-    Html.section [
-        prop.className "h-screen w-screen relative overflow-hidden"
-        prop.children [
-            // Meta viewport tag for proper mobile scaling
-            Html.meta [
-                prop.name "viewport"
-                prop.content "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+            Html.p [
+                prop.className "copy-status"
+                prop.text (copyStatusText model.CopyStatus)
             ]
-            
-            // Background div with image and glass effect
-            Html.div [
-                prop.className "absolute inset-0 bg-cover bg-center bg-fixed bg-no-repeat
-                bg-white/20 backdrop-blur-sm"
-                prop.style [
-                    style.backgroundImageUrl "https://unsplash.it/1200/900?random"
+            Html.section [
+                prop.className "options"
+                prop.children [
+                    optionCheckbox "Delete empty lines" DeleteEmptyLines model.Options.DeleteEmptyLines dispatch
+                    optionCheckbox
+                        "Remove separator lines"
+                        RemoveSeparatorLines
+                        model.Options.RemoveSeparatorLines
+                        dispatch
+                    optionCheckbox "Remove dot fillers" RemoveDotFillers model.Options.RemoveDotFillers dispatch
+                    optionCheckbox "Normalize spaces" NormalizeSpaces model.Options.NormalizeSpaces dispatch
+                    optionCheckbox
+                        "Keep key-value pairs only"
+                        KeepKeyValuePairsOnly
+                        model.Options.KeepKeyValuePairsOnly
+                        dispatch
+                    optionCheckbox "Shorten known values" ShortenKnownValues model.Options.ShortenKnownValues dispatch
+                    optionCheckbox
+                        "Shorten known keys / extreme"
+                        ShortenKnownKeys
+                        model.Options.ShortenKnownKeys
+                        dispatch
                 ]
             ]
-
-            // Content container (the rest of your UI)
-            Html.div [
-                prop.className "relative z-10 h-full w-full"
+            Html.section [
+                prop.className "columns"
                 prop.children [
-                    // Your existing content here
-                    Html.a [
-                        prop.href "https://safe-stack.github.io/"
-                        prop.className "absolute block ml-4 sm:ml-12 h-10 w-10 sm:h-12 sm:w-12 bg-teal-300 hover:cursor-pointer hover:bg-teal-400"
+                    Html.div [
+                        prop.className "pane"
                         prop.children [
-                            Html.img [ prop.src "/favicon.png"; prop.alt "Logo" ]
+                            Html.h2 [
+                                prop.className "pane-title"
+                                prop.text "Raw setup note"
+                            ]
+                            Html.textarea [
+                                prop.className "text-area"
+                                prop.value model.RawText
+                                prop.placeholder "Paste setup note text here..."
+                                prop.onChange (RawTextChanged >> dispatch)
+                            ]
                         ]
                     ]
-
-
                     Html.div [
-                        prop.className "flex flex-col items-center justify-center h-full"
+                        prop.className "pane"
                         prop.children [
-                            Html.div [
-                                prop.className "bg-white/20 backdrop-blur-lg p-4 sm:p-8 rounded-xl shadow-lg border border-white/30 mx-4 sm:mx-0 max-w-full sm:max-w-2xl"
-                                prop.children [
-                                    Html.h1 [
-                                        prop.className "text-center text-3xl sm:text-5xl font-bold mb-3 p-2 sm:p-4"
-                                        prop.text "SetupNoteBeautifier"
-                                    ]
-                                    ViewComponents.todoList model dispatch
-                                ]
+                            Html.h2 [
+                                prop.className "pane-title"
+                                prop.text "Generated output"
                             ]
+                            Html.textarea [
+                                prop.className "text-area"
+                                prop.value model.Output
+                                prop.readOnly true
+                            ]
+                            Html.p [
+                                prop.className (counterClassName model.CharacterCount)
+                                prop.text $"Characters: {model.CharacterCount}"
+                            ]
+                            lengthMessages model
                         ]
                     ]
                 ]
