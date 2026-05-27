@@ -37,6 +37,18 @@ dotnet run -- Bundle
 dotnet run -- Azure
 ```
 
+## Build and test
+
+Use these commands locally from the repository root:
+
+```bash
+dotnet tool restore
+dotnet restore Application.sln
+dotnet build Application.sln --configuration Release
+dotnet test Application.sln --configuration Release
+dotnet build src/Client/Client.fsproj --configuration Release
+```
+
 ## SAFE Stack Documentation
 
 If you want to know more about the full Azure Stack and all of it's components (including Azure) visit the official [SAFE documentation](https://safe-stack.github.io/docs/).
