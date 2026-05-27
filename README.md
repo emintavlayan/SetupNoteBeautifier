@@ -49,6 +49,38 @@ dotnet test Application.sln --configuration Release
 dotnet build src/Client/Client.fsproj --configuration Release
 ```
 
+## Static deployment
+
+Build the static client assets from the repository root:
+
+```bash
+dotnet build Application.sln --configuration Release
+dotnet run -- Bundle
+```
+
+Deployable static files are written to:
+
+`deploy/public`
+
+Example PowerShell copy command:
+
+```powershell
+$source = ".\deploy\public\*"
+$target = "C:\inetpub\wwwroot\SetupNoteBeautifier\"
+Copy-Item -Path $source -Destination $target -Recurse -Force
+```
+
+The `src/Server` project is kept for future logging/statistics work but is not used by the current setup note trimmer flow.
+
+In the current version, pasted setup text is processed in the browser and is not sent to a server.
+
+## Clinical trimming assumptions
+
+- This tool is a text formatter, not a clinical validator.
+- It preserves parsed values unless shortening options are explicitly enabled.
+- Extreme key shortening is optional.
+- Users must review copied output before pasting into the clinical system.
+
 ## SAFE Stack Documentation
 
 If you want to know more about the full Azure Stack and all of it's components (including Azure) visit the official [SAFE documentation](https://safe-stack.github.io/docs/).

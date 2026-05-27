@@ -152,8 +152,8 @@ module SetupNoteBeautifier =
         { Key = if options.ShortenKnownKeys then shortenKey pair.Key else pair.Key
           Value = if options.ShortenKnownValues then shortenValue pair.Value else pair.Value }
 
-    /// Renders key-value pairs in key=value format separated by new lines.
-    let renderKeyValues (pairs: KeyValue list) = pairs |> List.map (fun p -> $"{p.Key}={p.Value}") |> String.concat "\n"
+    /// Renders key-value pairs in key=value format separated by pipes.
+    let renderKeyValues (pairs: KeyValue list) = pairs |> List.map (fun p -> $"{p.Key}={p.Value}") |> String.concat " | "
 
     /// Builds a trim result from output and parsed pairs.
     let toTrimResult (output: string) (pairs: KeyValue list) =
