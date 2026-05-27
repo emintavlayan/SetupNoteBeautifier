@@ -247,7 +247,7 @@ let view model dispatch =
                         dispatch
                     optionCheckbox "Shorten known values" ShortenKnownValues model.Options.ShortenKnownValues dispatch
                     optionCheckbox
-                        "Shorten known keys / extreme"
+                        "Shorten known keys"
                         ShortenKnownKeys
                         model.Options.ShortenKnownKeys
                         dispatch

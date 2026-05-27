@@ -178,6 +178,7 @@ module SetupNoteBeautifier =
             |> fun xs -> if options.NormalizeSpaces then xs |> List.map collapseSpaces else xs
             |> fun xs -> if options.RemoveSeparatorLines then removeSeparatorLines xs else xs
             |> fun xs -> if options.RemoveDotFillers then removeDotFillersFromLines xs else xs
+            |> fun xs -> if options.RemoveHeaderLines then removeEmptyLines xs else xs
             |> List.map trimLine
 
         if options.RemoveHeaderLines then
