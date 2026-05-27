@@ -236,7 +236,7 @@ let view model dispatch =
                     optionCheckbox "Remove dot fillers" RemoveDotFillers model.Options.RemoveDotFillers dispatch
                     optionCheckbox "Normalize spaces" NormalizeSpaces model.Options.NormalizeSpaces dispatch
                     optionCheckbox
-                        "Remove header lines (titles)"
+                        "Remove titles"
                         RemoveHeaderLines
                         model.Options.RemoveHeaderLines
                         dispatch

@@ -10,24 +10,25 @@ type UpdateTests() =
         let model, _ = init ()
         let updatedModel, _ = update (RawTextChanged "Template:\nBreast") model
 
-        Assert.Equal("Template=Breast", updatedModel.Output)
+        Assert.Equal("Template:\nBreast", updatedModel.Output)
         Assert.Equal(updatedModel.Output.Length, updatedModel.CharacterCount)
 
     [<Fact>]
-    member _.``Toggling shorten known keys applies extreme key abbreviation in output``() =
+    member _.``Shorten known keys applies abbreviation when remove titles is enabled``() =
         let model, _ = init ()
         let withText, _ = update (RawTextChanged "Patient Orientation: Head First Supine") model
-        let updatedModel, _ = update (ToggleOption ShortenKnownKeys) withText
+        let withTitlesRemoved, _ = update (ToggleOption RemoveHeaderLines) withText
+        let updatedModel, _ = update (ToggleOption ShortenKnownKeys) withTitlesRemoved
 
         Assert.Equal("Ori=Head First Supine", updatedModel.Output)
 
     [<Fact>]
-    member _.``Loading sample fills raw text and produces parsed output``() =
+    member _.``Loading sample fills raw text and keeps output unformatted by default``() =
         let model, _ = init ()
         let updatedModel, _ = update LoadSample model
 
         Assert.True(updatedModel.RawText.Contains("Template:"))
-        Assert.True(updatedModel.Output.Contains("Template=Breast"))
+        Assert.Equal(updatedModel.RawText, updatedModel.Output)
         Assert.True(updatedModel.CharacterCount > 0)
 
     [<Fact>]

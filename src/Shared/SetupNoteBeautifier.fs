@@ -24,10 +24,10 @@ type TrimResult =
 module SetupNoteBeautifier =
     /// Default trimming options for setup note cleanup.
     let defaultOptions =
-        { RemoveSeparatorLines = true
-          RemoveDotFillers = true
-          NormalizeSpaces = true
-          RemoveHeaderLines = true
+        { RemoveSeparatorLines = false
+          RemoveDotFillers = false
+          NormalizeSpaces = false
+          RemoveHeaderLines = false
           RemoveEmptyKeys = false
           ShortenKnownKeys = false
           ShortenKnownValues = false }
@@ -47,9 +47,6 @@ module SetupNoteBeautifier =
     /// Trims leading and trailing whitespace from one line.
     let trimLine (line: string) = line.Trim()
 
-    /// Trims leading and trailing whitespace from all lines.
-    let trimLines (lines: string list) = lines |> List.map trimLine
-
     /// Returns true when a line is made only of separator symbols.
     let isSeparatorLine (line: string) =
         let trimmed = line.Trim()
@@ -67,7 +64,7 @@ module SetupNoteBeautifier =
     let removeSeparatorLines (lines: string list) = lines |> List.filter (isSeparatorLine >> not)
 
     /// Removes dot filler sequences from one line.
-    let removeDotFillersFromLine (line: string) = Regex.Replace(line, @"\.{3,}", "").Trim()
+    let removeDotFillersFromLine (line: string) = Regex.Replace(line, @"\.{3,}", "")
 
     /// Removes dot fillers from all lines.
     let removeDotFillersFromLines (lines: string list) = lines |> List.map removeDotFillersFromLine
@@ -119,7 +116,7 @@ module SetupNoteBeautifier =
 
     /// Normalizes key and value text for one pair.
     let normalizeKeyValue (normalizeSpaces: bool) (pair: KeyValue) =
-        let normalize = if normalizeSpaces then collapseSpaces else trimLine
+        let normalize = if normalizeSpaces then collapseSpaces else id
         { Key = normalize pair.Key; Value = normalize pair.Value }
 
     /// Returns shortened key text for known key names.
@@ -178,18 +175,21 @@ module SetupNoteBeautifier =
             rawText
             |> normalizeLineEndings
             |> splitLines
-            |> trimLines
-            |> fun xs -> if options.NormalizeSpaces then removeEmptyLines xs else xs
+            |> fun xs -> if options.NormalizeSpaces then xs |> List.map collapseSpaces else xs
             |> fun xs -> if options.RemoveSeparatorLines then removeSeparatorLines xs else xs
             |> fun xs -> if options.RemoveDotFillers then removeDotFillersFromLines xs else xs
+            |> List.map trimLine
 
-        let keyValues =
-            lines
-            |> parseKeyValues
-            |> List.map (normalizeKeyValue options.NormalizeSpaces)
-            |> List.map (shortenKnown options)
-            |> fun xs -> if options.RemoveEmptyKeys then removeEmptyValues xs else xs
+        if options.RemoveHeaderLines then
+            let keyValues =
+                lines
+                |> parseKeyValues
+                |> List.map (normalizeKeyValue options.NormalizeSpaces)
+                |> List.map (shortenKnown options)
+                |> fun xs -> if options.RemoveEmptyKeys then removeEmptyValues xs else xs
 
-        let pairs = if options.RemoveHeaderLines then keyValues else keyValues
-        pairs |> renderKeyValues |> fun output -> toTrimResult output pairs
+            keyValues |> renderKeyValues |> fun output -> toTrimResult output keyValues
+        else
+            let output = String.concat "\n" lines
+            toTrimResult output []
 
