@@ -3,6 +3,9 @@ framework: net8.0
 storage: none
 
 nuget Expecto ~> 9
+nuget xunit ~> 2
+nuget xunit.runner.visualstudio ~> 2
+nuget Microsoft.NET.Test.Sdk ~> 17
 nuget SAFE.Server ~> 5
 nuget SAFE.Client ~> 5
 

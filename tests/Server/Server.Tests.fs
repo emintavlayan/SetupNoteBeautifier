@@ -1,24 +1,27 @@
-module Server.Tests
+namespace Server.Tests
 
-open Expecto
-
-open Shared
 open Server
+open Shared
+open Xunit
 
-let server =
-    testList "Server" [
-        testCase "Adding valid Todo"
-        <| fun _ ->
-            let validTodo = Todo.create "TODO"
-            let expectedResult = Ok()
+type StorageTests() =
+    [<Fact>]
+    member _.``Adding a valid todo returns Ok and stores the item for later retrieval``() =
+        let todo = Todo.create "Review setup note formatting rules"
+        let beforeCount = Storage.todos.Count
 
-            let result = Storage.addTodo validTodo
+        let result = Storage.addTodo todo
 
-            Expect.equal result expectedResult "Result should be ok"
-            Expect.contains Storage.todos validTodo "Storage should contain new todo"
-    ]
+        Assert.Equal(Ok(), result)
+        Assert.Equal(beforeCount + 1, Storage.todos.Count)
+        Assert.Equal(todo, Storage.todos[Storage.todos.Count - 1])
 
-let all = testList "All" [ Shared.Tests.shared; server ]
+    [<Fact>]
+    member _.``Adding an invalid todo returns an error so empty tasks are never persisted``() =
+        let todo = Todo.create ""
+        let beforeCount = Storage.todos.Count
 
-[<EntryPoint>]
-let main _ = runTestsWithCLIArgs [] [||] all
+        let result = Storage.addTodo todo
+
+        Assert.Equal(Error "Invalid todo", result)
+        Assert.Equal(beforeCount, Storage.todos.Count)

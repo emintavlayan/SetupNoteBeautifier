@@ -1,39 +1,25 @@
-module Client.Tests
-
-open Fable.Mocha
+namespace Client.Tests
 
 open Index
-open Shared
 open SAFE
+open Shared
+open Xunit
 
-let client =
-    testList "Client" [
-        testCase "Added todo"
-        <| fun _ ->
-            let newTodo = Todo.create "new todo"
-            let model, _ = init ()
-            let model, _ = update (SaveTodo(Finished [ newTodo ])) model
+type UpdateTests() =
+    [<Fact>]
+    member _.``SaveTodo finished updates model with returned todos for immediate UI refresh``() =
+        let newTodo = Todo.create "new todo"
+        let model, _ = init ()
+        let updatedModel, _ = update (SaveTodo(Finished [ newTodo ])) model
+        let todoCount = updatedModel.Todos |> RemoteData.map _.Length |> RemoteData.defaultValue 0
+        let firstTodo = updatedModel.Todos |> RemoteData.map List.head |> RemoteData.defaultValue (Todo.create "")
 
-            Expect.equal
-                (model.Todos |> RemoteData.map _.Length |> RemoteData.defaultValue 0)
-                1
-                "There should be 1 todo"
+        Assert.Equal(1, todoCount)
+        Assert.Equal(newTodo, firstTodo)
 
-            Expect.equal
-                (model.Todos
-                 |> RemoteData.map List.head
-                 |> RemoteData.defaultValue (Todo.create ""))
-                newTodo
-                "Todo should equal new todo"
-    ]
+    [<Fact>]
+    member _.``SetInput updates only the input text so typing does not mutate todo data``() =
+        let model, _ = init ()
+        let updatedModel, _ = update (SetInput "Beam check") model
 
-let all =
-    testList "All" [
-        #if FABLE_COMPILER // This preprocessor directive makes editor happy
-        Shared.Tests.shared
-#endif
-                client
-    ]
-
-[<EntryPoint>]
-let main _ = Mocha.runTests all
+        Assert.Equal("Beam check", updatedModel.Input)

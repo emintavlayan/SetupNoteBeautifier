@@ -1,2 +1,4 @@
-Expecto
+xunit
+xunit.runner.visualstudio
+Microsoft.NET.Test.Sdk
 FSharp.Core
