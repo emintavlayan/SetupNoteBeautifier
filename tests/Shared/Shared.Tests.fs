@@ -58,7 +58,7 @@ type SetupNoteBeautifierRegressionTests() =
     [<Fact>]
     member _.``Default mode removes empty lines and supports next-line values``() =
         let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions SetupNoteSamples.nextLineValuesOnly
-        Assert.Equal("Template=Breast | Patient Orientation=Head First Supine | Comments=no", result.Output)
+        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=no", result.Output)
 
     [<Fact>]
     member _.``Default mode removes separator lines and ignores header lines without colons``() =
@@ -83,9 +83,9 @@ type SetupNoteBeautifierRegressionTests() =
         Assert.Equal("Right arm cup=Vinge H\u00f8: C, S: 2", result.Output)
 
     [<Fact>]
-    member _.``Default mode renders key value pairs with pipe separator``() =
+    member _.``Default mode renders key value pairs with newline separator``() =
         let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions SetupNoteSamples.sameLineValuesOnly
-        Assert.Equal("Template=Breast | Patient Orientation=Head First Supine | Comments=yes", result.Output)
+        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=yes", result.Output)
 
     [<Fact>]
     member _.``Default mode character count equals output length``() =
