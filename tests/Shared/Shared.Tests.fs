@@ -15,7 +15,7 @@ type SetupNoteBeautifierTests() =
     member _.``Empty lines are removed so note output only contains meaningful data``() =
         let input = "Template:\n\nBreast\n\nPatient Orientation: Head First Supine"
         let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions input
-        Assert.Equal("Template=Breast | Patient Orientation=Head First Supine", result.Output)
+        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine", result.Output)
 
     [<Fact>]
     member _.``Dot fillers are removed before key value rendering``() =
@@ -31,9 +31,9 @@ type SetupNoteBeautifierTests() =
 
     [<Fact>]
     member _.``Value lines may contain colons and are preserved as part of the value``() =
-        let input = "Right arm cup : .....................\nVinge Hø:  C, S:  2"
+        let input = "Right arm cup : .....................\nVinge H\u00f8:  C, S:  2"
         let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions input
-        Assert.Equal("Right arm cup=Vinge Hø: C, S: 2", result.Output)
+        Assert.Equal("Right arm cup=Vinge H\u00f8: C, S: 2", result.Output)
 
     [<Fact>]
     member _.``Header lines without colon are ignored unless used as carry-over value``() =
@@ -42,10 +42,10 @@ type SetupNoteBeautifierTests() =
         Assert.Equal("Template=Breast", result.Output)
 
     [<Fact>]
-    member _.``Default render joins key value pairs with pipe separators``() =
+    member _.``Default render joins key value pairs with newline separators``() =
         let input = "Template: Breast\nPatient Orientation: Head First Supine"
         let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions input
-        Assert.Equal("Template=Breast | Patient Orientation=Head First Supine", result.Output)
+        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine", result.Output)
 
     [<Fact>]
     member _.``CharacterCount always matches the exact output string length``() =
