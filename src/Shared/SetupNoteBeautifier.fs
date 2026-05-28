@@ -7,7 +7,7 @@ type TrimOptions =
     { RemoveSeparatorLines: bool
       RemoveDotFillers: bool
       NormalizeSpaces: bool
-      RemoveHeaderLines: bool
+      RemoveTitles: bool
       RemoveEmptyKeys: bool
       ShortenKnownKeys: bool
       ShortenKnownValues: bool }
@@ -24,10 +24,10 @@ type TrimResult =
 module SetupNoteBeautifier =
     /// Default trimming options for setup note cleanup.
     let defaultOptions =
-        { RemoveSeparatorLines = false
-          RemoveDotFillers = false
-          NormalizeSpaces = false
-          RemoveHeaderLines = false
+        { RemoveSeparatorLines = true
+          RemoveDotFillers = true
+          NormalizeSpaces = true
+          RemoveTitles = true
           RemoveEmptyKeys = false
           ShortenKnownKeys = false
           ShortenKnownValues = false }
@@ -178,10 +178,10 @@ module SetupNoteBeautifier =
             |> fun xs -> if options.NormalizeSpaces then xs |> List.map collapseSpaces else xs
             |> fun xs -> if options.RemoveSeparatorLines then removeSeparatorLines xs else xs
             |> fun xs -> if options.RemoveDotFillers then removeDotFillersFromLines xs else xs
-            |> fun xs -> if options.RemoveHeaderLines then removeEmptyLines xs else xs
+            |> fun xs -> if options.RemoveTitles then removeEmptyLines xs else xs
             |> List.map trimLine
 
-        if options.RemoveHeaderLines then
+        if options.RemoveTitles then
             let keyValues =
                 lines
                 |> parseKeyValues

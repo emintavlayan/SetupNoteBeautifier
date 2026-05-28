@@ -89,7 +89,7 @@ body {
 
 .text-area {
     width: 100%;
-    min-height: 360px;
+    min-height: 560px;
     border: 1px solid #bcccdc;
     border-radius: 4px;
     padding: 0.6rem;
@@ -135,6 +135,6 @@ body {
     }
 
     .text-area {
-        min-height: 260px;
+        min-height: 460px;
     }
 }

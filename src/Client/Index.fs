@@ -49,15 +49,71 @@ let writeClipboard (text: string) : JS.Promise<unit> = jsNative
 let sampleSetupNote =
     String.concat
         "\n"
-        [ "General"
-          "Template:"
-          "Breast"
+        [ "Template: "
+          " Breast"
+          " "
           ""
-          "Patient Orientation: Head First Supine"
-          "Right arm cup : ....................."
-          "Vinge H\u00f8:  C, S:  2"
+          " "
+          "Patient Orientation: "
+          " Head First Supine"
+          " "
+          "Prescription(s): "
+          " -"
+          " "
+          ""
+          " "
+          "General"
+          " "
+          "Deep inspiration breathhold: ........................... "
+          " no"
+          " "
+          "Head turned: ........................ "
+          " left"
+          " "
+          ""
+          " "
           "Breast board"
-          "Comments: yes" ]
+          " "
+          "Kile: ......................................... "
+          " L2"
+          " "
+          "Right arm cup : ..................... "
+          " Vinge H\u00f8:  C, S:  2"
+          " "
+          "Left arm cup : ....................... "
+          " Vinge Ve:  C, S:  2"
+          " "
+          "Bas: ......................................... "
+          " 5"
+          " "
+          "Opstilling long: ..................... "
+          " 6,5"
+          " "
+          "Pinde: ..................................... "
+          " Mellem"
+          " "
+          ""
+          " "
+          "Kn\u00e6pude"
+          " "
+          "Kn\u00e6pude: .............................. "
+          " Yes"
+          " "
+          ""
+          " "
+          ""
+          " "
+          ""
+          " "
+          "Comments"
+          " "
+          "C1"
+          " "
+          ""
+          " "
+          "Photos"
+          " "
+          "--------------------" ]
 
 /// Applies trim options to raw input and returns output text with character count.
 let applyTrim (options: TrimOptions) (rawText: string) =
@@ -77,7 +133,7 @@ let toggleOption (field: OptionField) (options: TrimOptions) =
     | RemoveSeparatorLines -> { options with RemoveSeparatorLines = not options.RemoveSeparatorLines }
     | RemoveDotFillers -> { options with RemoveDotFillers = not options.RemoveDotFillers }
     | NormalizeSpaces -> { options with NormalizeSpaces = not options.NormalizeSpaces }
-    | RemoveHeaderLines -> { options with RemoveHeaderLines = not options.RemoveHeaderLines }
+    | RemoveHeaderLines -> { options with RemoveTitles = not options.RemoveTitles }
     | RemoveEmptyKeys -> { options with RemoveEmptyKeys = not options.RemoveEmptyKeys }
     | ShortenKnownValues -> { options with ShortenKnownValues = not options.ShortenKnownValues }
     | ShortenKnownKeys -> { options with ShortenKnownKeys = not options.ShortenKnownKeys }
@@ -238,7 +294,7 @@ let view model dispatch =
                     optionCheckbox
                         "Remove titles"
                         RemoveHeaderLines
-                        model.Options.RemoveHeaderLines
+                        model.Options.RemoveTitles
                         dispatch
                     optionCheckbox
                         "Remove empty keys"

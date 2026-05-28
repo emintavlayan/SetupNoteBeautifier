@@ -85,7 +85,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Remove titles mode supports next-line values``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true }
+                RemoveTitles = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.nextLineValuesOnly
         Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=no", result.Output)
@@ -94,7 +94,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Default mode removes separator lines and ignores header lines without colons``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true
+                RemoveTitles = true
                 RemoveSeparatorLines = true
                 RemoveDotFillers = true }
 
@@ -108,7 +108,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Default mode removes dot fillers before parsing values``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true
+                RemoveTitles = true
                 RemoveDotFillers = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.breastSetupNoteWithHeadersAndFillers
@@ -120,7 +120,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Default mode preserves colons inside parsed value text``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true
+                RemoveTitles = true
                 RemoveDotFillers = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.colonInValue
@@ -130,7 +130,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Default mode renders key value pairs with newline separator``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true }
+                RemoveTitles = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.sameLineValuesOnly
         Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=yes", result.Output)
@@ -139,14 +139,14 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Default mode character count equals output length``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true }
+                RemoveTitles = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.sameLineValuesOnly
         Assert.Equal(result.Output.Length, result.CharacterCount)
 
     [<Fact>]
     member _.``When RemoveDotFillers is false filler dots remain if they are part of inline parsed values``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true }
 
         let input = "Comments: ....................."
         let result = SetupNoteBeautifier.trim options input
@@ -154,35 +154,35 @@ type SetupNoteBeautifierRegressionTests() =
 
     [<Fact>]
     member _.``When ShortenKnownKeys is false full key names are preserved``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true; ShortenKnownKeys = false }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownKeys = false }
 
         let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
         Assert.Equal("Patient Orientation=Head First Supine", result.Output)
 
     [<Fact>]
     member _.``When ShortenKnownKeys is true known keys are shortened``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true; ShortenKnownKeys = true }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownKeys = true }
 
         let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
         Assert.Equal("Ori=Head First Supine", result.Output)
 
     [<Fact>]
     member _.``When ShortenKnownValues is false full values are preserved``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true; ShortenKnownValues = false }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownValues = false }
 
         let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
         Assert.Equal("Patient Orientation=Head First Supine", result.Output)
 
     [<Fact>]
     member _.``When ShortenKnownValues is true known values are shortened``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true; ShortenKnownValues = true }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownValues = true }
 
         let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
         Assert.Equal("Patient Orientation=HFS", result.Output)
 
     [<Fact>]
     member _.``Missing key value does not consume later title as value``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveHeaderLines = true }
+        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true }
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.keyWithoutImmediateValue
         Assert.Equal("Prescriptions=\nComments=yes", result.Output)
 
@@ -190,7 +190,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``When RemoveEmptyKeys is true entries with empty values are removed``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true
+                RemoveTitles = true
                 RemoveEmptyKeys = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.keyWithoutImmediateValue
@@ -200,7 +200,7 @@ type SetupNoteBeautifierRegressionTests() =
     member _.``Prescription key does not consume General title as value``() =
         let options =
             { SetupNoteBeautifier.defaultOptions with
-                RemoveHeaderLines = true
+                RemoveTitles = true
                 RemoveDotFillers = true }
 
         let result = SetupNoteBeautifier.trim options SetupNoteSamples.prescriptionWithDashAndGeneral
