@@ -56,6 +56,8 @@ module SetupNoteBeautifier =
           "Kile", "Kile"
           "Bas", "Bas"
           "Opstilling long", "Long"
+          "Right arm cup", "RArm"
+          "Left arm cup", "LArm"
           "Pinde", "Pinde"
           "Gatingboks", "Gatingboks" ]
 
@@ -166,7 +168,7 @@ module SetupNoteBeautifier =
     let canUseNextLineAsValue (line: string) =
         not (String.IsNullOrWhiteSpace line)
         && not (isReservedSectionTitle line)
-        && not (line.Contains(':'))
+        && not (isKnownKeyLine line)
 
     /// Parses known key-value pairs while supporting values on the immediate next non-empty line.
     let parseKnownKeyValues (lines: string list) =

@@ -31,12 +31,12 @@ module SetupNoteSamples =
               "Head Neck"
               "Patient Orientation:"
               "Head First Supine"
-              "Nakkestøtte"
-              "Nakkestøtter: ..........................."
+              "Nakkest\u00f8tte"
+              "Nakkest\u00f8tter: ..........................."
               "Mellem"
               "Maske"
-              "Knæpude"
-              "Knæpude: På bryst"
+              "Kn\u00e6pude"
+              "Kn\u00e6pude: P\u00e5 bryst"
               "Comments"
               "Photos" ]
 
@@ -51,14 +51,26 @@ module SetupNoteSamples =
               "Yes"
               "Breast board"
               "Kile: L2"
-              "Knæpude"
-              "Knæpude: På bryst"
+              "Kn\u00e6pude"
+              "Kn\u00e6pude: P\u00e5 bryst"
               "Gatingboks"
               "Gatingboks: Yes"
               "Comments:"
               ""
               "Photos"
               "------------------------" ]
+
+    let rightArmCupSetupNote =
+        String.concat
+            "\n"
+            [ "Right arm cup:"
+              "Vinge H\u00f8: C, S: 2" ]
+
+    let leftArmCupSetupNote =
+        String.concat
+            "\n"
+            [ "Left arm cup:"
+              "Vinge Ve: C, S: 2" ]
 
 type SetupNoteBeautifierRegressionTests() =
     [<Fact>]
@@ -91,7 +103,7 @@ type SetupNoteBeautifierRegressionTests() =
         let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields SetupNoteSamples.headNeckSetupNote
 
         Assert.Equal(
-            "Template=Head Neck\nPatient Orientation=Head First Supine\nNakkestøtter=Mellem\nKnæpude=På bryst",
+            "Template=Head Neck\nPatient Orientation=Head First Supine\nNakkest\u00f8tter=Mellem\nKn\u00e6pude=P\u00e5 bryst",
             result.Output
         )
 
@@ -103,22 +115,35 @@ type SetupNoteBeautifierRegressionTests() =
         Assert.Contains("Patient Orientation=Head First Supine", parsed.Output)
         Assert.Contains("Patient Orientation=HFS", shortened.Output)
         Assert.Contains("Deep inspiration breathhold=yes", shortened.Output)
-        Assert.Contains("Knæpude=På bryst", shortened.Output)
+        Assert.Contains("Kn\u00e6pude=P\u00e5 bryst", shortened.Output)
         Assert.Contains("Kile=L2", shortened.Output)
+
+    [<Fact>]
+    member _.``Right arm cup next-line value may contain colons``() =
+        let parsed = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields SetupNoteSamples.rightArmCupSetupNote
+        let shortened = SetupNoteBeautifier.trim ProcessingLevel.ShortenSafeKeys SetupNoteSamples.rightArmCupSetupNote
+
+        Assert.Equal("Right arm cup=Vinge H\u00f8: C, S: 2", parsed.Output)
+        Assert.Equal("RArm=Vinge H\u00f8: C, S: 2", shortened.Output)
+
+    [<Fact>]
+    member _.``Left arm cup next-line value may contain colons``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ShortenSafeKeys SetupNoteSamples.leftArmCupSetupNote
+        Assert.Equal("LArm=Vinge Ve: C, S: 2", result.Output)
 
     [<Fact>]
     member _.``Shorten safe keys uses the compact key map without translating Danish values``() =
         let result = SetupNoteBeautifier.trim ProcessingLevel.ShortenSafeKeys SetupNoteSamples.breastSetupNote
 
         Assert.Equal(
-            "Tpl=Breast\nOri=HFS\nDIBH=yes\nKile=L2\nKnæpude=På bryst\nGatingboks=yes",
+            "Tpl=Breast\nOri=HFS\nDIBH=yes\nKile=L2\nKn\u00e6pude=P\u00e5 bryst\nGatingboks=yes",
             result.Output
         )
 
     [<Fact>]
     member _.``Compact final renders pipe separated output``() =
         let result = SetupNoteBeautifier.trim ProcessingLevel.CompactFinal SetupNoteSamples.breastSetupNote
-        Assert.Equal("Tpl=Breast | Ori=HFS | DIBH=yes | Kile=L2 | Knæpude=På bryst | Gatingboks=yes", result.Output)
+        Assert.Equal("Tpl=Breast | Ori=HFS | DIBH=yes | Kile=L2 | Kn\u00e6pude=P\u00e5 bryst | Gatingboks=yes", result.Output)
 
     [<Fact>]
     member _.``Output character count equals output length``() =
