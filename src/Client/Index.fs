@@ -1,5 +1,6 @@
 module Index
 
+open System
 open Elmish
 open Feliz
 open Fable.Core
@@ -15,18 +16,9 @@ type CounterState =
     | CounterWarning
     | CounterError
 
-type OptionField =
-    | RemoveSeparatorLines
-    | RemoveDotFillers
-    | NormalizeSpaces
-    | RemoveHeaderLines
-    | RemoveEmptyKeys
-    | ShortenKnownValues
-    | ShortenKnownKeys
-
 type Model =
     { RawText: string
-      Options: TrimOptions
+      ProcessingLevel: ProcessingLevel
       Output: string
       CharacterCount: int
       CopyStatus: CopyStatus }
@@ -34,7 +26,7 @@ type Model =
 type Msg =
     | RawTextChanged of string
     | OutputTextChanged of string
-    | ToggleOption of OptionField
+    | SetProcessingLevel of int
     | LoadSample
     | CopyOutput
     | OutputCopied
@@ -49,94 +41,60 @@ let writeClipboard (text: string) : JS.Promise<unit> = jsNative
 let sampleSetupNote =
     String.concat
         "\n"
-        [ "Template: "
-          " Breast"
-          " "
+        [ "Template:"
+          "Breast"
           ""
-          " "
-          "Patient Orientation: "
-          " Head First Supine"
-          " "
-          "Prescription(s): "
-          " -"
-          " "
+          "Patient Orientation:"
+          "Head First Supine"
           ""
-          " "
           "General"
-          " "
-          "Deep inspiration breathhold: ........................... "
-          " no"
-          " "
-          "Head turned: ........................ "
-          " left"
-          " "
+          "Deep inspiration breathhold: ..........................."
+          "Yes"
           ""
-          " "
           "Breast board"
-          " "
-          "Kile: ......................................... "
-          " L2"
-          " "
-          "Right arm cup : ..................... "
-          " Vinge H\u00f8:  C, S:  2"
-          " "
-          "Left arm cup : ....................... "
-          " Vinge Ve:  C, S:  2"
-          " "
-          "Bas: ......................................... "
-          " 5"
-          " "
-          "Opstilling long: ..................... "
-          " 6,5"
-          " "
-          "Pinde: ..................................... "
-          " Mellem"
-          " "
+          "Kile: L2"
+          "Bas: B+20"
+          "Opstilling long:"
+          "Mellem"
           ""
-          " "
-          "Kn\u00e6pude"
-          " "
-          "Kn\u00e6pude: .............................. "
-          " Yes"
-          " "
+          "Knæpude"
+          "Knæpude: På bryst"
           ""
-          " "
-          ""
-          " "
-          ""
-          " "
-          "Comments"
-          " "
-          "C1"
-          " "
-          ""
-          " "
-          "Photos"
-          " "
-          "--------------------" ]
+          "Gatingboks"
+          "Gatingboks: Yes"
+          "Unknown note: should be ignored"
+          "//////" ]
 
-/// Applies trim options to raw input and returns output text with character count.
-let applyTrim (options: TrimOptions) (rawText: string) =
-    let result = SetupNoteBeautifier.trim options rawText
+let processingLevels =
+    [ ProcessingLevel.Raw, "Raw"
+      ProcessingLevel.CleanLines, "Clean lines"
+      ProcessingLevel.RemoveVisualNoise, "Remove visual noise"
+      ProcessingLevel.ParseKnownFields, "Parse known setup fields only"
+      ProcessingLevel.ShortenSafeValues, "Shorten safe values"
+      ProcessingLevel.ShortenSafeKeys, "Shorten safe keys"
+      ProcessingLevel.CompactFinal, "Compact final output" ]
+
+let processingLevelFromInt (value: int) =
+    let clamped = max 0 (min 6 value)
+    enum<ProcessingLevel> clamped
+
+let processingLevelLabel (level: ProcessingLevel) =
+    processingLevels
+    |> List.find (fun (candidate, _) -> candidate = level)
+    |> snd
+
+/// Applies the selected processing level and returns output text with character count.
+let applyProcessing (level: ProcessingLevel) (rawText: string) =
+    let result = SetupNoteBeautifier.trim level rawText
     result.Output, result.CharacterCount
 
 /// Recomputes output and character count after model changes.
 let evaluateModel (model: Model) =
-    let output, characterCount = applyTrim model.Options model.RawText
+    let output, characterCount = applyProcessing model.ProcessingLevel model.RawText
+
     { model with
         Output = output
         CharacterCount = characterCount }
-
-/// Toggles one trimming option in the current options record.
-let toggleOption (field: OptionField) (options: TrimOptions) =
-    match field with
-    | RemoveSeparatorLines -> { options with RemoveSeparatorLines = not options.RemoveSeparatorLines }
-    | RemoveDotFillers -> { options with RemoveDotFillers = not options.RemoveDotFillers }
-    | NormalizeSpaces -> { options with NormalizeSpaces = not options.NormalizeSpaces }
-    | RemoveHeaderLines -> { options with RemoveTitles = not options.RemoveTitles }
-    | RemoveEmptyKeys -> { options with RemoveEmptyKeys = not options.RemoveEmptyKeys }
-    | ShortenKnownValues -> { options with ShortenKnownValues = not options.ShortenKnownValues }
-    | ShortenKnownKeys -> { options with ShortenKnownKeys = not options.ShortenKnownKeys }
 
 /// Returns counter visual state from output character count.
 let counterState (count: int) =
@@ -173,7 +131,7 @@ let copyOutputCmd (text: string) =
 let init () =
     let baseModel =
         { RawText = ""
-          Options = SetupNoteBeautifier.defaultOptions
+          ProcessingLevel = SetupNoteBeautifier.defaultProcessingLevel
           Output = ""
           CharacterCount = 0
           CopyStatus = NotCopied }
@@ -195,9 +153,9 @@ let update msg model =
             CharacterCount = value.Length
             CopyStatus = NotCopied },
         Cmd.none
-    | ToggleOption field ->
+    | SetProcessingLevel value ->
         { model with
-            Options = toggleOption field model.Options
+            ProcessingLevel = processingLevelFromInt value
             CopyStatus = NotCopied }
         |> evaluateModel,
         Cmd.none
@@ -217,27 +175,14 @@ let update msg model =
         |> evaluateModel,
         Cmd.none
 
-/// Renders one checkbox option bound to a toggle message.
-let optionCheckbox (label: string) field value dispatch =
-    Html.label [
-        prop.className "option-item"
-        prop.children [
-            Html.input [
-                prop.type'.checkbox
-                prop.isChecked value
-                prop.onChange (fun (_: bool) -> dispatch (ToggleOption field))
-            ]
-            Html.span [ prop.text label ]
-        ]
-    ]
-
 /// Renders contextual output length warning messages.
 let lengthMessages (model: Model) =
     let messages =
-        [ if model.CharacterCount > SetupNoteBeautifier.warningLimit && not model.Options.ShortenKnownKeys then
+        [ if model.CharacterCount > SetupNoteBeautifier.warningLimit
+             && int model.ProcessingLevel < int ProcessingLevel.ShortenSafeKeys then
               Html.p [
                   prop.className "message message-warning"
-                  prop.text "Output is long. Enable extreme key shortening if needed."
+                  prop.text "Output is long. Increase processing level if the extra shortening is clinically safe."
               ]
           if model.CharacterCount > SetupNoteBeautifier.hardLimit then
               Html.p [
@@ -246,6 +191,54 @@ let lengthMessages (model: Model) =
               ] ]
 
     Html.div [ prop.children messages ]
+
+let processingSlider model dispatch =
+    Html.section [
+        prop.className "processing-panel"
+        prop.children [
+            Html.div [
+                prop.className "processing-header"
+                prop.children [
+                    Html.h2 [
+                        prop.className "pane-title"
+                        prop.text "Processing level"
+                    ]
+                    Html.p [
+                        prop.className "processing-current"
+                        prop.text (processingLevelLabel model.ProcessingLevel)
+                    ]
+                ]
+            ]
+            Html.input [
+                prop.className "processing-slider"
+                prop.type'.range
+                prop.min 0
+                prop.max 6
+                prop.step 1
+                prop.value (int model.ProcessingLevel)
+                prop.onChange (fun (value: string) -> value |> int |> SetProcessingLevel |> dispatch)
+            ]
+            Html.div [
+                prop.className "processing-scale"
+                prop.children (
+                    processingLevels
+                    |> List.map (fun (level, label) ->
+                        Html.div [
+                            prop.className (
+                                if level = model.ProcessingLevel then
+                                    "processing-step processing-step-active"
+                                else
+                                    "processing-step"
+                            )
+                            prop.children [
+                                Html.span [ prop.className "processing-step-index"; prop.text (string (int level)) ]
+                                Html.span [ prop.className "processing-step-label"; prop.text label ]
+                            ]
+                        ])
+                )
+            ]
+        ]
+    ]
 
 /// Renders the setup note trimmer page.
 let view model dispatch =
@@ -281,34 +274,7 @@ let view model dispatch =
                 prop.className "copy-status"
                 prop.text (copyStatusText model.CopyStatus)
             ]
-            Html.section [
-                prop.className "options"
-                prop.children [
-                    optionCheckbox
-                        "Remove separator lines"
-                        RemoveSeparatorLines
-                        model.Options.RemoveSeparatorLines
-                        dispatch
-                    optionCheckbox "Remove dot fillers" RemoveDotFillers model.Options.RemoveDotFillers dispatch
-                    optionCheckbox "Normalize spaces" NormalizeSpaces model.Options.NormalizeSpaces dispatch
-                    optionCheckbox
-                        "Remove titles"
-                        RemoveHeaderLines
-                        model.Options.RemoveTitles
-                        dispatch
-                    optionCheckbox
-                        "Remove empty keys"
-                        RemoveEmptyKeys
-                        model.Options.RemoveEmptyKeys
-                        dispatch
-                    optionCheckbox "Shorten known values" ShortenKnownValues model.Options.ShortenKnownValues dispatch
-                    optionCheckbox
-                        "Shorten known keys"
-                        ShortenKnownKeys
-                        model.Options.ShortenKnownKeys
-                        dispatch
-                ]
-            ]
+            processingSlider model dispatch
             Html.section [
                 prop.className "columns"
                 prop.children [

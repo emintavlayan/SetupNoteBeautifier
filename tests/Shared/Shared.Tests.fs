@@ -11,218 +11,137 @@ type TodoTests() =
         Assert.False(actual)
 
 module SetupNoteSamples =
-    let breastSetupNoteWithHeadersAndFillers =
+    let pelvisSetupNote =
         String.concat
             "\n"
-            [ "General"
-              "Template:"
-              "Breast"
-              ""
-              "Deep inspiration breathhold: yes"
-              "Head turned: right"
-              "Breast board"
-              "Right arm cup : ....................."
-              "Vinge H\u00f8:  C, S:  2"
-              "Left arm cup: Vinge Ve: C, S: 3"
-              "Bas: 15"
-              "Opstilling long:"
-              "Pinde: 4"
-              "Kn\u00e6pude: yes"
-              "Comments: no"
-              "-----------------------------" ]
+            [ "Course number"
+              "Course Number: 12"
+              "Benfiksation"
+              "Arme"
+              "Arme: Oppe"
+              "Madras"
+              "Madras: Kort madras"
+              "Unknown line: should be ignored"
+              "//////" ]
 
-    let sameLineValuesOnly =
+    let headNeckSetupNote =
         String.concat
             "\n"
-            [ "Template: Breast"
-              "Patient Orientation: Head First Supine"
-              "Comments: yes" ]
+            [ "Template:"
+              "Head Neck"
+              "Patient Orientation:"
+              "Head First Supine"
+              "Nakkestøtte"
+              "Nakkestøtter: ..........................."
+              "Mellem"
+              "Maske"
+              "Knæpude"
+              "Knæpude: På bryst"
+              "Comments"
+              "Photos" ]
 
-    let nextLineValuesOnly =
+    let breastSetupNote =
         String.concat
             "\n"
             [ "Template:"
               "Breast"
-              "Patient Orientation:"
-              "Head First Supine"
-              "Comments:"
-              "no" ]
-
-    let colonInValue =
-        String.concat
-            "\n"
-            [ "Right arm cup : ....................."
-              "Vinge H\u00f8: C, S: 2" ]
-
-    let keyWithoutImmediateValue =
-        String.concat
-            "\n"
-            [ "Prescriptions:"
-              ""
-              ""
-              "Comments:"
-              "yes" ]
-
-    let prescriptionWithDashAndGeneral =
-        String.concat
-            "\n"
-            [ "Prescription(s):"
-              "-"
-              ""
-              ""
+              "Patient Orientation: Head First Supine"
               "General"
+              "Deep inspiration breathhold:"
+              "Yes"
+              "Breast board"
+              "Kile: L2"
+              "Knæpude"
+              "Knæpude: På bryst"
+              "Gatingboks"
+              "Gatingboks: Yes"
+              "Comments:"
               ""
-              "Deep inspiration breathhold: ..........................."
-              "no" ]
+              "Photos"
+              "------------------------" ]
 
 type SetupNoteBeautifierRegressionTests() =
     [<Fact>]
-    member _.``Default mode returns input unchanged when no options are enabled``() =
-        let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions SetupNoteSamples.nextLineValuesOnly
-        Assert.Equal(SetupNoteSamples.nextLineValuesOnly, result.Output)
+    member _.``Raw level returns input unchanged``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.Raw SetupNoteSamples.headNeckSetupNote
+        Assert.Equal(SetupNoteSamples.headNeckSetupNote, result.Output)
 
     [<Fact>]
-    member _.``Remove titles mode supports next-line values``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true }
-
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.nextLineValuesOnly
-        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=no", result.Output)
+    member _.``Clean lines removes blank lines and trims each line``() =
+        let input = " Template: \n \n Breast \n"
+        let result = SetupNoteBeautifier.trim ProcessingLevel.CleanLines input
+        Assert.Equal("Template:\nBreast", result.Output)
 
     [<Fact>]
-    member _.``Default mode removes separator lines and ignores header lines without colons``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true
-                RemoveSeparatorLines = true
-                RemoveDotFillers = true }
-
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.breastSetupNoteWithHeadersAndFillers
-
-        Assert.DoesNotContain("General", result.Output)
-        Assert.DoesNotContain("Breast board", result.Output)
-        Assert.DoesNotContain("-----------------------------", result.Output)
+    member _.``Remove visual noise strips separator and slash lines``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.RemoveVisualNoise SetupNoteSamples.pelvisSetupNote
+        Assert.DoesNotContain("//////", result.Output)
 
     [<Fact>]
-    member _.``Default mode removes dot fillers before parsing values``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true
-                RemoveDotFillers = true }
+    member _.``Parse known fields only ignores section titles and unknown colon lines``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields SetupNoteSamples.pelvisSetupNote
 
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.breastSetupNoteWithHeadersAndFillers
-
-        Assert.DoesNotContain(".....", result.Output)
-        Assert.Contains("Right arm cup=Vinge H\u00f8:", result.Output)
+        Assert.Equal("Course Number=12\nArme=Oppe\nMadras=Kort madras", result.Output)
+        Assert.DoesNotContain("Course number", result.Output)
+        Assert.DoesNotContain("Benfiksation", result.Output)
+        Assert.DoesNotContain("Unknown line", result.Output)
 
     [<Fact>]
-    member _.``Default mode preserves colons inside parsed value text``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true
-                RemoveDotFillers = true }
+    member _.``Next-line parsing preserves Danish values while dot fillers do not block key recognition``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields SetupNoteSamples.headNeckSetupNote
 
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.colonInValue
-        Assert.Equal("Right arm cup=Vinge H\u00f8: C, S: 2", result.Output)
-
-    [<Fact>]
-    member _.``Default mode renders key value pairs with newline separator``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true }
-
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.sameLineValuesOnly
-        Assert.Equal("Template=Breast\nPatient Orientation=Head First Supine\nComments=yes", result.Output)
+        Assert.Equal(
+            "Template=Head Neck\nPatient Orientation=Head First Supine\nNakkestøtter=Mellem\nKnæpude=På bryst",
+            result.Output
+        )
 
     [<Fact>]
-    member _.``Default mode character count equals output length``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true }
+    member _.``Known English values are shortened only at shorten-safe-values level``() =
+        let parsed = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields SetupNoteSamples.breastSetupNote
+        let shortened = SetupNoteBeautifier.trim ProcessingLevel.ShortenSafeValues SetupNoteSamples.breastSetupNote
 
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.sameLineValuesOnly
+        Assert.Contains("Patient Orientation=Head First Supine", parsed.Output)
+        Assert.Contains("Patient Orientation=HFS", shortened.Output)
+        Assert.Contains("Deep inspiration breathhold=yes", shortened.Output)
+        Assert.Contains("Knæpude=På bryst", shortened.Output)
+        Assert.Contains("Kile=L2", shortened.Output)
+
+    [<Fact>]
+    member _.``Shorten safe keys uses the compact key map without translating Danish values``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ShortenSafeKeys SetupNoteSamples.breastSetupNote
+
+        Assert.Equal(
+            "Tpl=Breast\nOri=HFS\nDIBH=yes\nKile=L2\nKnæpude=På bryst\nGatingboks=yes",
+            result.Output
+        )
+
+    [<Fact>]
+    member _.``Compact final renders pipe separated output``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.CompactFinal SetupNoteSamples.breastSetupNote
+        Assert.Equal("Tpl=Breast | Ori=HFS | DIBH=yes | Kile=L2 | Knæpude=På bryst | Gatingboks=yes", result.Output)
+
+    [<Fact>]
+    member _.``Output character count equals output length``() =
+        let result = SetupNoteBeautifier.trim ProcessingLevel.CompactFinal SetupNoteSamples.breastSetupNote
         Assert.Equal(result.Output.Length, result.CharacterCount)
-
-    [<Fact>]
-    member _.``When RemoveDotFillers is false filler dots remain if they are part of inline parsed values``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true }
-
-        let input = "Comments: ....................."
-        let result = SetupNoteBeautifier.trim options input
-        Assert.Equal("Comments=.....................", result.Output)
-
-    [<Fact>]
-    member _.``When ShortenKnownKeys is false full key names are preserved``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownKeys = false }
-
-        let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
-        Assert.Equal("Patient Orientation=Head First Supine", result.Output)
-
-    [<Fact>]
-    member _.``When ShortenKnownKeys is true known keys are shortened``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownKeys = true }
-
-        let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
-        Assert.Equal("Ori=Head First Supine", result.Output)
-
-    [<Fact>]
-    member _.``When ShortenKnownValues is false full values are preserved``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownValues = false }
-
-        let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
-        Assert.Equal("Patient Orientation=Head First Supine", result.Output)
-
-    [<Fact>]
-    member _.``When ShortenKnownValues is true known values are shortened``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true; ShortenKnownValues = true }
-
-        let result = SetupNoteBeautifier.trim options "Patient Orientation: Head First Supine"
-        Assert.Equal("Patient Orientation=HFS", result.Output)
-
-    [<Fact>]
-    member _.``Missing key value does not consume later title as value``() =
-        let options = { SetupNoteBeautifier.defaultOptions with RemoveTitles = true }
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.keyWithoutImmediateValue
-        Assert.Equal("Prescriptions=\nComments=yes", result.Output)
-
-    [<Fact>]
-    member _.``When RemoveEmptyKeys is true entries with empty values are removed``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true
-                RemoveEmptyKeys = true }
-
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.keyWithoutImmediateValue
-        Assert.Equal("Comments=yes", result.Output)
-
-    [<Fact>]
-    member _.``Prescription key does not consume General title as value``() =
-        let options =
-            { SetupNoteBeautifier.defaultOptions with
-                RemoveTitles = true
-                RemoveDotFillers = true }
-
-        let result = SetupNoteBeautifier.trim options SetupNoteSamples.prescriptionWithDashAndGeneral
-        Assert.Equal("Prescription(s)=\nDeep inspiration breathhold=no", result.Output)
 
     [<Fact>]
     member _.``Output length at or below 230 has no warning and no hard limit``() =
         let value = String.replicate 220 "a"
-        let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions $"Comments: {value}"
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields $"Template: {value}"
         Assert.False(result.IsAboveWarningLimit)
         Assert.False(result.IsAboveHardLimit)
 
     [<Fact>]
     member _.``Output length between 231 and 250 has warning only``() =
         let value = String.replicate 240 "a"
-        let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions $"Comments: {value}"
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields $"Template: {value}"
         Assert.True(result.IsAboveWarningLimit)
         Assert.False(result.IsAboveHardLimit)
 
     [<Fact>]
     member _.``Output length above 250 has warning and hard limit``() =
         let value = String.replicate 260 "a"
-        let result = SetupNoteBeautifier.trim SetupNoteBeautifier.defaultOptions $"Comments: {value}"
+        let result = SetupNoteBeautifier.trim ProcessingLevel.ParseKnownFields $"Template: {value}"
         Assert.True(result.IsAboveWarningLimit)
         Assert.True(result.IsAboveHardLimit)
